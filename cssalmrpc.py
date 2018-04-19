@@ -1,11 +1,10 @@
 import time
 import re
+import argparse
 
 from collections import OrderedDict
 
-import argparse
-
-from pvaccess import RpcServer, PvObject, NtTable, STRING, LONG
+import pvaccess as pva
 
 from sql import AlarmSql
 
@@ -34,14 +33,14 @@ class AlarmRPC(object):
 
         data = zip(*filtered_res)
 
-        vals = OrderedDict([("column0", [STRING]),
-                            ("column1", [STRING]),
-                            ("column2", [STRING]),
-                            ("column3", [STRING]),
-                            ("column4", [STRING]),
-                            ("column5", [STRING]),
-                            ("column6", [LONG])])
-        table = PvObject(OrderedDict({"labels": [STRING], "value": vals}),
+        vals = OrderedDict([("column0", [pva.STRING]),
+                            ("column1", [pva.STRING]),
+                            ("column2", [pva.STRING]),
+                            ("column3", [pva.STRING]),
+                            ("column4", [pva.STRING]),
+                            ("column5", [pva.STRING]),
+                            ("column6", [pva.LONG])])
+        table = pva.PvObject(OrderedDict({"labels": [pva.STRING], "value": vals}),
                          'epics:nt/NTTable:1.0')
         labels = ["time", "group", "severity",
                   "status", "message", "record", "severity_id"]
@@ -72,7 +71,8 @@ def parsearg():
     parser = argparse.ArgumentParser(description="CSS Alarm API pvAccess RPC.")
     parser.add_argument("-r", "--root", dest="root", required=True,
                         help="Alarm RDB Root Name")
-    parser.add_argument("-p", "--prefix", dest="prefix", help="PV Name Prefix")
+    parser.add_argument("-p", "--prefix", dest="prefix", required=True,
+                        help="PV Name Prefix")
     parser.add_argument("-H", "--host", dest="host", default="localhost",
                         help="Alarm RDB Host")
     parser.add_argument("-d", "--db", dest="db", default="alarm",
@@ -87,7 +87,7 @@ def main():
     arg = parsearg()
     alarm_rpc = AlarmRPC(arg.db, arg.host, arg.user, arg.root)
 
-    srv = RpcServer()
+    srv = pva.RpcServer()
     srv.registerService(arg.prefix + "get", alarm_rpc.get)
     srv.startListener()
 
