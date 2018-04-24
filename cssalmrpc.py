@@ -1,6 +1,7 @@
 import time
 import re
 import argparse
+from datetime import datetime
 
 from collections import OrderedDict
 
@@ -10,15 +11,41 @@ from sql import AlarmSql
 
 
 class AlarmRPC(object):
-    def __init__(self, dbname, host, dbuser, root):
-        self._rdb = AlarmSql(dbname, host, dbuser, root)
+    def __init__(self, dbname, logdbname, host, dbuser, root):
+        self._rdb = AlarmSql(dbname, logdbname, host, dbuser, root)
         self._rdb.connect()
+        self._rdb.update_pvlist()
 
     def close(self):
         self._rdb.close()
         
     def get(self, arg):
-        entity = arg.getString("entity") if arg.hasField("entity") else ".*"
+        try:
+            mode = arg.getString("mode") if arg.hasField("mode") else "current"
+            entity = arg.getString("entity") if arg.hasField("entity") else ".*"
+        except:
+            return pva.PvBoolean(False)
+
+        if mode == "history":
+            try:
+                starttime = arg.getString("starttime")
+                endtime = arg.getString("endtime")
+                table = self.get_history(entity, starttime, endtime)
+                return table
+            except:
+                return pva.PvBoolean(False)
+
+
+        if mode == "current":
+            try:
+                table = self.get_current(entity)
+                return table
+            except:
+                return pva.PvBoolean(False)
+
+        return pva.PvBoolean(False)
+
+    def get_current(self, entity):
         pattern = re.compile(entity)
 
         # "time", "group", "subgroup", "subsubgroup"
@@ -63,8 +90,68 @@ class AlarmRPC(object):
 
         return table
 
+    def get_history(self, group, starttime, endtime):
+        # id, datum, record_name, severity, eventtime, status, group, message
+        try:
+            start = self._iso_to_dt(starttime)
+            end = self._iso_to_dt(endtime)
+        except:
+            raise
+
+        if group == "all":
+            sql_res = self._rdb.history_alarm_all(start, end)
+        else:
+            sql_res = self._rdb.history_alarm_group(group, start, end)
+
+        alarms = []
+        recovers = []
+        for row in sql_res:
+            alarm = str(row[7]) if row[3] != "OK" else ""
+            recover = str(row[7]) if row[3] == "OK" else ""
+
+            alarms.append(alarm)
+            recovers.append(recover)
+
+        data = zip(*sql_res)
+
+        vals = OrderedDict([("column0", [pva.STRING]),
+                            ("column1", [pva.STRING]),
+                            ("column2", [pva.STRING]),
+                            ("column3", [pva.STRING]),
+                            ("column4", [pva.STRING]),
+                            ("column5", [pva.STRING]),
+                            ("column6", [pva.STRING])
+                            ])
+        table = pva.PvObject(OrderedDict({"labels": [pva.STRING], "value": vals}),
+                         'epics:nt/NTTable:1.0')
+        labels = ["time", "group", "severity", "status",
+                  "alarm", "recover", "record"]
+        table.setScalarArray("labels", labels)
+
+        if not data:
+            return table
+
+        table.setStructure("value", OrderedDict({"column0": list(data[4]),
+                                                 "column1": list(data[6]),
+                                                 "column2": list(data[3]),
+                                                 "column3": list(data[5]),
+                                                 "column4": alarms,
+                                                 "column5": recovers,
+                                                 "column6": list(data[2])
+                                                })
+                          )
+
+        return table
+
     def _sgstr(self, sg_str):
         return " / " + sg_str if sg_str else ""
+
+    def _iso_to_dt(self, iso_str):
+        try:
+            dt = datetime.strptime(iso_str, "%Y-%m-%dT%H:%M:%S")
+            return dt
+        except:
+            raise
 
 
 def parsearg():
@@ -77,6 +164,8 @@ def parsearg():
                         help="Alarm RDB Host")
     parser.add_argument("-d", "--db", dest="db", default="alarm",
                         help="Alarm RDB DB Name")
+    parser.add_argument("-l", "--logdb", dest="logdb", default="log",
+                        help="Log DB Name")
     parser.add_argument("-u", "--user", dest="user", default="report",
                         help="Alarm RDB User Name")
 
@@ -85,7 +174,7 @@ def parsearg():
 
 def main():
     arg = parsearg()
-    alarm_rpc = AlarmRPC(arg.db, arg.host, arg.user, arg.root)
+    alarm_rpc = AlarmRPC(arg.db, arg.logdb, arg.host, arg.user, arg.root)
 
     srv = pva.RpcServer()
     srv.registerService(arg.prefix + "get", alarm_rpc.get)
