@@ -53,10 +53,15 @@ class AlarmSql(object):
     def history_alarm_all(self, starttime, endtime):
         # id, datum, record_name, severity, eventtime, status
         self.cur_log.execute(SQL_HISTORY_ALL, (starttime, endtime))
-        data = self.cur_log.fetchall()
+        sql_res = self.cur_log.fetchall()
 
-        data = [r + (self.pvlist[r[2]]["group"], self.pvlist[r[2]]["msg"])
-                for r in data]
+        data = []
+        for row in sql_res:
+            if row[2] in self.pvlist:
+                t = (self.pvlist[row[2]]["group"], self.pvlist[row[2]]["msg"])
+            else:
+                t = ("Unkown", "Unkown")
+            data.append(row + t)
 
         return data
 
