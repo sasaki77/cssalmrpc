@@ -114,7 +114,7 @@ SQL_HISTORY_ALL = """
                   GROUP BY
                     message.id
                   ORDER BY
-                    message.id, message.datum
+                    message.datum DESC
                   LIMIT
                     100000
                   """
@@ -153,7 +153,7 @@ SQL_HISTORY_GROUP = """
                     GROUP BY
                       message.id
                     ORDER BY
-                      message.id, message.datum
+                      message.datum DESC
                     LIMIT
                       100000
                     """
