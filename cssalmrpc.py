@@ -83,10 +83,10 @@ class AlarmRPC(object):
         table.setStructure("value", OrderedDict({"column0": time,
                                                  "column1": group,
                                                  "column2": list(data[8]),
-                                                 "column3": list(data[5]),
-                                                 "column4": list(data[6]),
-                                                 "column5": list(data[7]),
-                                                 "column6": list(data[4])}))
+                                                 "column3": list(data[4]),
+                                                 "column4": list(data[5]),
+                                                 "column5": list(data[6]),
+                                                 "column6": list(data[7])}))
 
         return table
 
