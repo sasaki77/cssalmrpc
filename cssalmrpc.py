@@ -62,15 +62,15 @@ class AlarmRPC(object):
 
         vals = OrderedDict([("column0", [pva.STRING]),
                             ("column1", [pva.STRING]),
-                            ("column2", [pva.STRING]),
+                            ("column2", [pva.LONG]),
                             ("column3", [pva.STRING]),
                             ("column4", [pva.STRING]),
                             ("column5", [pva.STRING]),
-                            ("column6", [pva.LONG])])
+                            ("column6", [pva.STRING])])
         table = pva.PvObject(OrderedDict({"labels": [pva.STRING], "value": vals}),
                          'epics:nt/NTTable:1.0')
-        labels = ["time", "group", "severity",
-                  "status", "message", "record", "severity_id"]
+        labels = ["time", "group",  "severity_id", "severity",
+                  "status", "message", "record"]
         table.setScalarArray("labels", labels)
 
         if not data:
@@ -82,11 +82,11 @@ class AlarmRPC(object):
 
         table.setStructure("value", OrderedDict({"column0": time,
                                                  "column1": group,
-                                                 "column2": list(data[4]),
+                                                 "column2": list(data[8]),
                                                  "column3": list(data[5]),
                                                  "column4": list(data[6]),
                                                  "column5": list(data[7]),
-                                                 "column6": list(data[8])}))
+                                                 "column6": list(data[4])}))
 
         return table
 
