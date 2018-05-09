@@ -18,30 +18,29 @@ class AlarmRPC(object):
 
     def close(self):
         self._rdb.close()
-        
+
     def get(self, arg):
-        try:
-            mode = arg.getString("mode") if arg.hasField("mode") else "current"
-            entity = arg.getString("entity") if arg.hasField("entity") else ".*"
-        except:
-            return pva.PvBoolean(False)
+        mode = arg.getString("mode") if arg.hasField("mode") else "current"
+        entity = arg.getString("entity") if arg.hasField("entity") else ".*"
 
         if mode == "history":
             try:
                 starttime = arg.getString("starttime")
                 endtime = arg.getString("endtime")
+            except (pva.FieldNotFound, pva.InvalidRequest):
+                print "Error: Invalid argumets"
+                return pva.PvBoolean(False)
+
+            try:
                 table = self.get_history(entity, starttime, endtime)
                 return table
-            except:
+            except ValueError:
+                print "Error: Invalid argumets"
                 return pva.PvBoolean(False)
-
 
         if mode == "current":
-            try:
-                table = self.get_current(entity)
-                return table
-            except:
-                return pva.PvBoolean(False)
+            table = self.get_current(entity)
+            return table
 
         return pva.PvBoolean(False)
 
@@ -67,8 +66,10 @@ class AlarmRPC(object):
                             ("column4", [pva.STRING]),
                             ("column5", [pva.STRING]),
                             ("column6", [pva.STRING])])
-        table = pva.PvObject(OrderedDict({"labels": [pva.STRING], "value": vals}),
-                         'epics:nt/NTTable:1.0')
+        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
+                                          "value": vals}
+                                         ),
+                             'epics:nt/NTTable:1.0')
         labels = ["time", "group",  "severity_id", "severity",
                   "status", "message", "record"]
         table.setScalarArray("labels", labels)
@@ -95,7 +96,7 @@ class AlarmRPC(object):
         try:
             start = self._iso_to_dt(starttime)
             end = self._iso_to_dt(endtime)
-        except:
+        except ValueError:
             raise
 
         if group == "all":
@@ -122,8 +123,10 @@ class AlarmRPC(object):
                             ("column5", [pva.STRING]),
                             ("column6", [pva.STRING])
                             ])
-        table = pva.PvObject(OrderedDict({"labels": [pva.STRING], "value": vals}),
-                         'epics:nt/NTTable:1.0')
+        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
+                                         "value": vals}
+                                         ),
+                             'epics:nt/NTTable:1.0')
         labels = ["time", "group", "severity", "status",
                   "alarm", "recover", "record"]
         table.setScalarArray("labels", labels)
@@ -138,8 +141,8 @@ class AlarmRPC(object):
                                                  "column4": alarms,
                                                  "column5": recovers,
                                                  "column6": list(data[2])
-                                                })
-                          )
+                                                 })
+                           )
 
         return table
 
@@ -150,7 +153,7 @@ class AlarmRPC(object):
         try:
             dt = datetime.strptime(iso_str, "%Y-%m-%dT%H:%M:%S")
             return dt
-        except:
+        except ValueError:
             raise
 
 
@@ -183,7 +186,7 @@ def main():
     try:
         while True:
             time.sleep(1)
-    except:
+    except KeyboardInterrupt:
         print "exit"
     finally:
         alarm_rpc.close()

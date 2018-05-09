@@ -4,6 +4,7 @@ import psycopg2
 
 from sqlstate import *
 
+
 class AlarmSql(object):
     def __init__(self, dbname, logdbname, host, user, root):
         self.dbname = dbname
@@ -22,13 +23,13 @@ class AlarmSql(object):
 
     def connect(self):
         self.conn_alm = psycopg2.connect(dbname=self.dbname,
-                                     host=self.host,
-                                     user=self.dbuser)
+                                         host=self.host,
+                                         user=self.dbuser)
         self.cur_alm = self.conn_alm.cursor()
 
         self.conn_log = psycopg2.connect(dbname=self.logdbname,
-                                     host=self.host,
-                                     user=self.dbuser)
+                                         host=self.host,
+                                         user=self.dbuser)
         self.cur_log = self.conn_log.cursor()
 
     def close(self):
@@ -95,7 +96,7 @@ class AlarmSql(object):
             group += " / " + row[3] if row[3] else ""
             group += " / " + row[4] if row[4] else ""
 
-            if not group in self.grouplist:
+            if group not in self.grouplist:
                 self.grouplist[group] = []
 
             self.grouplist[group].append(row[0])
