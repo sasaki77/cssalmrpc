@@ -38,7 +38,8 @@ optional arguments:
 
 ## API
 
-- $(prefix):get
+- $(prefix):current
+- $(prefix):history
 
 ### Example 1: current status
 

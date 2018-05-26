@@ -19,32 +19,9 @@ class AlarmRPC(object):
     def close(self):
         self._rdb.close()
 
-    def get(self, arg):
-        mode = arg.getString("mode") if arg.hasField("mode") else "current"
+    def get_current(self, arg):
         entity = arg.getString("entity") if arg.hasField("entity") else ".*"
 
-        if mode == "history":
-            try:
-                starttime = arg.getString("starttime")
-                endtime = arg.getString("endtime")
-            except (pva.FieldNotFound, pva.InvalidRequest):
-                print "Error: Invalid argumets"
-                return pva.PvBoolean(False)
-
-            try:
-                table = self.get_history(entity, starttime, endtime)
-                return table
-            except ValueError:
-                print "Error: Invalid argumets"
-                return pva.PvBoolean(False)
-
-        if mode == "current":
-            table = self.get_current(entity)
-            return table
-
-        return pva.PvBoolean(False)
-
-    def get_current(self, entity):
         pattern = re.compile(entity)
 
         # "time", "group", "subgroup", "subsubgroup"
@@ -91,13 +68,23 @@ class AlarmRPC(object):
 
         return table
 
-    def get_history(self, group, starttime, endtime):
+    def get_history(self, arg):
+        group = arg.getString("entity") if arg.hasField("entity") else ".*"
+
+        try:
+            starttime = arg.getString("starttime")
+            endtime = arg.getString("endtime")
+        except (pva.FieldNotFound, pva.InvalidRequest):
+            print "Error: Invalid argumets"
+            return pva.PvBoolean(False)
+
         # id, datum, record_name, severity, eventtime, status, group, message
         try:
             start = self._iso_to_dt(starttime)
             end = self._iso_to_dt(endtime)
         except ValueError:
-            raise
+            print "Error: Invalid argumets"
+            return pva.PvBoolean(False)
 
         if group == "all":
             sql_res = self._rdb.history_alarm_all(start, end)
@@ -180,7 +167,8 @@ def main():
     alarm_rpc = AlarmRPC(arg.db, arg.logdb, arg.host, arg.user, arg.root)
 
     srv = pva.RpcServer()
-    srv.registerService(arg.prefix + "get", alarm_rpc.get)
+    srv.registerService(arg.prefix + "current", alarm_rpc.get_current)
+    srv.registerService(arg.prefix + "history", alarm_rpc.get_history)
     srv.startListener()
 
     try:
