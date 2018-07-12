@@ -67,15 +67,21 @@ class AlarmSql(object):
         return data
 
     def history_alarm_group(self, group, message, starttime, endtime):
-        pattern = re.compile(group)
+        try:
+            pattern = re.compile(group)
+        except re.error:
+            return []
 
         pvlist = []
         for g, pvs in self.grouplist.items():
             if pattern.match(g):
                 pvlist.extend(pvs)
 
-        if message:
-            mre = re.compile(message)
+        if message and message != ".*":
+            try:
+                mre = re.compile(message)
+            except re.error:
+                return []
             pvlist = [pv for pv in pvlist if mre.match(self.pvlist[pv]["msg"])]
 
         # id, datum, record_name, severity, eventtime, status
