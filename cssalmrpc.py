@@ -70,6 +70,7 @@ class AlarmRPC(object):
 
     def get_history(self, arg):
         group = arg.getString("entity") if arg.hasField("entity") else ".*"
+        msg = arg.getString("message") if arg.hasField("message") else ""
 
         try:
             starttime = arg.getString("starttime")
@@ -89,7 +90,7 @@ class AlarmRPC(object):
         if group == "all":
             sql_res = self._rdb.history_alarm_all(start, end)
         else:
-            sql_res = self._rdb.history_alarm_group(group, start, end)
+            sql_res = self._rdb.history_alarm_group(group, msg, start, end)
 
         alarms = []
         recovers = []
