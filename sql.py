@@ -51,12 +51,32 @@ class AlarmSql(object):
         data = self.cur_alm.fetchall()
         return data
 
-    def history_alarm_all(self, starttime, endtime):
+    def history_alarm_all(self, message, starttime, endtime):
+        # with message filter
+        if message and message != ".*":
+            try:
+                mre = re.compile(message)
+            except re.error:
+                return []
+            pvlist = [pv for pv, val in self.pvlist.items()
+                      if mre.match(val["msg"])]
+            # id, datum, record_name, severity, eventtime, status
+            self.cur_log.execute(SQL_HISTORY_GROUP,
+                                 (starttime, endtime, pvlist))
+            data = self.cur_log.fetchall()
+
+            data = [r + (self.pvlist[r[2]]["group"], self.pvlist[r[2]]["msg"])
+                    for r in data]
+
+            return data
+
+        # without message filter
         # id, datum, record_name, severity, eventtime, status
         self.cur_log.execute(SQL_HISTORY_ALL, (starttime, endtime))
         sql_res = self.cur_log.fetchall()
 
         data = []
+
         for row in sql_res:
             if row[2] in self.pvlist:
                 t = (self.pvlist[row[2]]["group"], self.pvlist[row[2]]["msg"])

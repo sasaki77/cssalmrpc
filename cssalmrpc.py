@@ -88,7 +88,7 @@ class AlarmRPC(object):
             return pva.PvBoolean(False)
 
         if group == "all":
-            sql_res = self._rdb.history_alarm_all(start, end)
+            sql_res = self._rdb.history_alarm_all(msg, start, end)
         else:
             sql_res = self._rdb.history_alarm_group(group, msg, start, end)
 
