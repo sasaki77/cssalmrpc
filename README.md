@@ -46,7 +46,6 @@ optional arguments:
 Example request
 ```
 structure 
-    string mode current
     string entity MPS
 ```
 
@@ -72,8 +71,8 @@ Example request
 structure 
     string starttime 2018-05-17T11:00:00
     string endtime 2018-05-17T11:30:00
-    string mode history
     string entity VAC
+    string message .*High.*
 ```
 
 
