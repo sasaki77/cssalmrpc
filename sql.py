@@ -25,11 +25,13 @@ class AlarmSql(object):
         self.conn_alm = psycopg2.connect(dbname=self.dbname,
                                          host=self.host,
                                          user=self.dbuser)
+        self.conn_alm.autocommit=True
         self.cur_alm = self.conn_alm.cursor()
 
         self.conn_log = psycopg2.connect(dbname=self.logdbname,
                                          host=self.host,
                                          user=self.dbuser)
+        self.conn_log.autocommit=True
         self.cur_log = self.conn_log.cursor()
 
     def close(self):
