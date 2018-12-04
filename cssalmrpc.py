@@ -69,7 +69,7 @@ class AlarmRPC(object):
         return table
 
     def get_history(self, arg):
-        group = arg.getString("entity") if arg.hasField("entity") else ".*"
+        group = arg.getString("entity") if arg.hasField("entity") else "all"
         msg = arg.getString("message") if arg.hasField("message") else ""
 
         try:
