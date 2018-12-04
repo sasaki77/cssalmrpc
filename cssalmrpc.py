@@ -21,12 +21,16 @@ class AlarmRPC(object):
 
     def get_current(self, arg):
         entity = arg.getString("entity") if arg.hasField("entity") else ".*"
+        msg = arg.getString("message") if arg.hasField("message") else ""
 
         pattern = re.compile(entity)
 
         # "time", "group", "subgroup", "subsubgroup"
         # "severity", "status", "message", "record"
-        sql_res = self._rdb.current_alarm()
+        if msg:
+            sql_res = self._rdb.current_alarm_msg(msg)
+        else:
+            sql_res = self._rdb.current_alarm_all()
 
         filtered_res = []
         for row in sql_res:

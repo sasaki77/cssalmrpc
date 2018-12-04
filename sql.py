@@ -45,8 +45,14 @@ class AlarmSql(object):
 
         print "close"
 
-    def current_alarm(self):
-        sql_str = SQL_CURRENT_ALARM.format(self.root)
+    def current_alarm_all(self):
+        sql_str = SQL_CURRENT_ALARM_ALL.format(self.root)
+        self.cur_alm.execute(sql_str)
+        data = self.cur_alm.fetchall()
+        return data
+
+    def current_alarm_msg(self, msg):
+        sql_str = SQL_CURRENT_ALARM_MSG.format(self.root, msg)
         self.cur_alm.execute(sql_str)
         data = self.cur_alm.fetchall()
         return data
