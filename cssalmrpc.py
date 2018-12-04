@@ -5,6 +5,7 @@ from datetime import datetime
 
 from collections import OrderedDict
 
+import psycopg2
 import pvaccess as pva
 
 from sql import AlarmSql
@@ -27,10 +28,13 @@ class AlarmRPC(object):
 
         # "time", "group", "subgroup", "subsubgroup"
         # "severity", "status", "message", "record"
-        if msg:
-            sql_res = self._rdb.current_alarm_msg(msg)
-        else:
-            sql_res = self._rdb.current_alarm_all()
+        try:
+            if msg:
+                sql_res = self._rdb.current_alarm_msg(msg)
+            else:
+                sql_res = self._rdb.current_alarm_all()
+        except psycopg2.Error:
+            return pva.PvBoolean(False)
 
         filtered_res = []
         for row in sql_res:
@@ -91,10 +95,13 @@ class AlarmRPC(object):
             print "Error: Invalid argumets"
             return pva.PvBoolean(False)
 
-        if group == "all":
-            sql_res = self._rdb.history_alarm_all(msg, start, end)
-        else:
-            sql_res = self._rdb.history_alarm_group(group, msg, start, end)
+        try:
+            if group == "all":
+                sql_res = self._rdb.history_alarm_all(msg, start, end)
+            else:
+                sql_res = self._rdb.history_alarm_group(group, msg, start, end)
+        except psycopg2.Error:
+            return pva.PvBoolean(False)
 
         alarms = []
         recovers = []

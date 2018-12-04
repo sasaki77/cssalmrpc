@@ -49,13 +49,19 @@ class AlarmSql(object):
 
     def current_alarm_all(self):
         sql_str = SQL_CURRENT_ALARM_ALL.format(self.root)
-        self.cur_alm.execute(sql_str)
+        try:
+            self.cur_alm.execute(sql_str)
+        except psycopg2.Error:
+            raise
         data = self.cur_alm.fetchall()
         return data
 
     def current_alarm_msg(self, msg):
         sql_str = SQL_CURRENT_ALARM_MSG.format(self.root, msg)
-        self.cur_alm.execute(sql_str)
+        try:
+            self.cur_alm.execute(sql_str)
+        except psycopg2.Error:
+            raise
         data = self.cur_alm.fetchall()
         return data
 
@@ -69,8 +75,11 @@ class AlarmSql(object):
             pvlist = [pv for pv, val in self.pvlist.items()
                       if mre.match(val["msg"])]
             # id, datum, record_name, severity, eventtime, status
-            self.cur_log.execute(SQL_HISTORY_GROUP,
-                                 (starttime, endtime, pvlist))
+            try:
+                self.cur_log.execute(SQL_HISTORY_GROUP,
+                                     (starttime, endtime, pvlist))
+            except psycopg2.Error:
+                raise
             data = self.cur_log.fetchall()
 
             data = [r + (self.pvlist[r[2]]["group"], self.pvlist[r[2]]["msg"])
@@ -80,7 +89,10 @@ class AlarmSql(object):
 
         # without message filter
         # id, datum, record_name, severity, eventtime, status
-        self.cur_log.execute(SQL_HISTORY_ALL, (starttime, endtime))
+        try:
+            self.cur_log.execute(SQL_HISTORY_ALL, (starttime, endtime))
+        except psycopg2.Error:
+            raise
         sql_res = self.cur_log.fetchall()
 
         data = []
