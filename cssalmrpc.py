@@ -34,7 +34,9 @@ class AlarmRPC(object):
             else:
                 sql_res = self._rdb.current_alarm_all()
         except psycopg2.Error:
-            return pva.PvBoolean(False)
+            msg = "RDB Error: entity = {}, msg = {}".format(entity, msg)
+            ret = self._make_error_res(msg)
+            return ret
 
         filtered_res = []
         for row in sql_res:
@@ -90,7 +92,9 @@ class AlarmRPC(object):
             else:
                 sql_res = self._rdb.current_alarm_all()
         except psycopg2.Error:
-            return pva.PvBoolean(False)
+            msg = "RDB Error: entity = {}, msg = {}".format(entity, msg)
+            ret = self._make_error_res(msg)
+            return ret
 
         filtered_res = []
         for row in sql_res:
@@ -133,7 +137,10 @@ class AlarmRPC(object):
             endtime = arg.getString("endtime")
         except (pva.FieldNotFound, pva.InvalidRequest):
             print "Error: Invalid argumets"
-            return pva.PvBoolean(False)
+            msg = "Arguments Error: starttime or endtime are invalid"
+            msg += ". args = " + str(arg)
+            ret = self._make_error_res(msg)
+            return ret
 
         # id, datum, record_name, severity, eventtime, status, group, message
         try:
@@ -141,7 +148,10 @@ class AlarmRPC(object):
             end = self._iso_to_dt(endtime)
         except ValueError:
             print "Error: Invalid argumets"
-            return pva.PvBoolean(False)
+            msg = "Arguments Error: starttime or endtime are invalid"
+            msg += ". args = " + str(arg)
+            ret = self._make_error_res(msg)
+            return ret
 
         try:
             if group == "all":
@@ -149,7 +159,11 @@ class AlarmRPC(object):
             else:
                 sql_res = self._rdb.history_alarm_group(group, msg, start, end)
         except psycopg2.Error:
-            return pva.PvBoolean(False)
+            temp = ("RDB Error: entity = {}, msg = {},"
+                    "starttime = {}, endtime={}")
+            msg = temp.format(entity, msg, starttime, endtime)
+            ret = self._make_error_res(msg)
+            return ret
 
         alarms = []
         recovers = []
@@ -202,6 +216,15 @@ class AlarmRPC(object):
             return dt
         except ValueError:
             raise
+
+    def _make_error_res(self, message):
+        ret = pva.PvObject(OrderedDict({"value": pva.BOOLEAN, "descriptor": pva.STRING}
+                                       ),
+                           "epics:nt/NTScalar:1.0")
+        ret["value"] = False
+        ret["descriptor"] = message
+        return ret
+
 
 
 def parsearg():
