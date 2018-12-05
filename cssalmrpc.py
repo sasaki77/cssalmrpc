@@ -76,6 +76,54 @@ class AlarmRPC(object):
 
         return table
 
+    def get_current_ann(self, arg):
+        entity = arg.getString("entity") if arg.hasField("entity") else ".*"
+        msg = arg.getString("message") if arg.hasField("message") else ""
+
+        pattern = re.compile(entity)
+
+        # "time", "group", "subgroup", "subsubgroup"
+        # "severity", "status", "message", "record"
+        try:
+            if msg:
+                sql_res = self._rdb.current_alarm_msg(msg)
+            else:
+                sql_res = self._rdb.current_alarm_all()
+        except psycopg2.Error:
+            return pva.PvBoolean(False)
+
+        filtered_res = []
+        for row in sql_res:
+            group = row[1] + self._sgstr(row[2]) + self._sgstr(row[3])
+            if pattern.match(group):
+                filtered_res.append(row)
+
+        data = zip(*filtered_res)
+
+        vals = OrderedDict([("column0", [pva.ULONG]),
+                            ("column1", [pva.STRING]),
+                            ("column2", [pva.STRING]),
+                            ("column3", [pva.STRING])])
+        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
+                                          "value": vals}
+                                         ),
+                             'epics:nt/NTTable:1.0')
+        table.setScalarArray("labels", ["time", "title", "tags", "text"])
+
+        if not data:
+            return table
+
+        time = [int(dt.strftime("%s%f")[:-3]) for dt in data[0]]
+        group = [g + self._sgstr(sg) + self._sgstr(ssg)
+                 for g, sg, ssg in zip(data[1], data[2], data[3])]
+
+        table.setStructure("value", OrderedDict({"column0": time,
+                                                 "column1": list(data[6]),
+                                                 "column2": group,
+                                                 "column3": list(data[7])}))
+
+        return table
+
     def get_history(self, arg):
         group = arg.getString("entity") if arg.hasField("entity") else "all"
         msg = arg.getString("message") if arg.hasField("message") else ""
@@ -180,6 +228,7 @@ def main():
 
     srv = pva.RpcServer()
     srv.registerService(arg.prefix + "current", alarm_rpc.get_current)
+    srv.registerService(arg.prefix + "current:ann", alarm_rpc.get_current_ann)
     srv.registerService(arg.prefix + "history", alarm_rpc.get_history)
     srv.startListener()
 
