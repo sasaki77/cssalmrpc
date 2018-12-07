@@ -1,5 +1,6 @@
 import re
 
+import pandas as pd
 import psycopg2
 
 from sqlstate import *
@@ -14,34 +15,25 @@ class AlarmSql(object):
         self.logdbname = logdbname
 
         self.conn_alm = None
-        self.cur_alm = None
         self.conn_log = None
-        self.cur_log = None
 
-        self.pvlist = {}
-        self.grouplist = {}
+        self.pvlist = None
 
     def connect(self):
         self.conn_alm = psycopg2.connect(dbname=self.dbname,
                                          host=self.host,
                                          user=self.dbuser)
-        self.conn_alm.autocommit=True
-        self.cur_alm = self.conn_alm.cursor()
+        self.conn_alm.autocommit = True
 
         self.conn_log = psycopg2.connect(dbname=self.logdbname,
                                          host=self.host,
                                          user=self.dbuser)
-        self.conn_log.autocommit=True
-        self.cur_log = self.conn_log.cursor()
+        self.conn_log.autocommit = True
 
     def close(self):
-        if self.cur_alm:
-            self.cur_alm.close()
         if self.conn_alm:
             self.conn_alm.close()
 
-        if self.cur_log:
-            self.cur_log.close()
         if self.conn_log:
             self.conn_log.close()
 
@@ -50,104 +42,91 @@ class AlarmSql(object):
     def current_alarm_all(self):
         sql_str = SQL_CURRENT_ALARM_ALL.format(self.root)
         try:
-            self.cur_alm.execute(sql_str)
-        except psycopg2.Error:
+            data = pd.read_sql(sql=sql_str, con=self.conn_alm)
+        except ValueError:
             raise
-        data = self.cur_alm.fetchall()
         return data
 
     def current_alarm_msg(self, msg):
         sql_str = SQL_CURRENT_ALARM_MSG.format(self.root, msg)
         try:
-            self.cur_alm.execute(sql_str)
-        except psycopg2.Error:
+            data = pd.read_sql(sql=sql_str, con=self.conn_alm)
+        except ValueError:
             raise
-        data = self.cur_alm.fetchall()
         return data
 
     def history_alarm_all(self, message, starttime, endtime):
         # with message filter
         if message and message != ".*":
             try:
-                mre = re.compile(message)
+                pvlist = self.pvlist[self.pvlist["message"].str.match(message)]
             except re.error:
                 return []
-            pvlist = [pv for pv, val in self.pvlist.items()
-                      if mre.match(val["msg"])]
             # id, datum, record_name, severity, eventtime, status
+
+            sql_str = SQL_HISTORY_GROUP.format(self.root)
+            params = (starttime, endtime, pvlist["record_name"].tolist())
+
             try:
-                self.cur_log.execute(SQL_HISTORY_GROUP,
-                                     (starttime, endtime, pvlist))
-            except psycopg2.Error:
+                data = pd.read_sql(sql=sql_str, con=self.conn_log,
+                                   params=params)
+            except ValueError:
                 raise
-            data = self.cur_log.fetchall()
 
-            data = [r + (self.pvlist[r[2]]["group"], self.pvlist[r[2]]["msg"])
-                    for r in data]
+            ret = data.merge(self.pvlist)
 
-            return data
+            return ret.sort_values(by="id", ascending=False)
 
         # without message filter
         # id, datum, record_name, severity, eventtime, status
+        sql_str = SQL_HISTORY_ALL.format(self.root)
+        params = (starttime, endtime)
+
         try:
-            self.cur_log.execute(SQL_HISTORY_ALL, (starttime, endtime))
-        except psycopg2.Error:
+            data = pd.read_sql(sql=sql_str, con=self.conn_log,
+                               params=params)
+        except ValueError:
             raise
-        sql_res = self.cur_log.fetchall()
 
-        data = []
+        ret = data.merge(self.pvlist, how="left")
+        ret["group"] = ret["group"].fillna("Unknown")
+        ret["message"] = ret["message"].fillna("Unknown")
 
-        for row in sql_res:
-            if row[2] in self.pvlist:
-                t = (self.pvlist[row[2]]["group"], self.pvlist[row[2]]["msg"])
-            else:
-                t = ("Unkown", "Unkown")
-            data.append(row + t)
-
-        return data
+        return ret.sort_values(by="id", ascending=False)
 
     def history_alarm_group(self, group, message, starttime, endtime):
         try:
-            pattern = re.compile(group)
+            mask = self.pvlist["group"].str.match(group, na=False)
+            pvlist = self.pvlist[mask]
+            pvlist = pvlist[pvlist["message"].str.match(message)]
         except re.error:
             return []
 
-        pvlist = []
-        for g, pvs in self.grouplist.items():
-            if pattern.match(g):
-                pvlist.extend(pvs)
-
-        if message and message != ".*":
-            try:
-                mre = re.compile(message)
-            except re.error:
-                return []
-            pvlist = [pv for pv in pvlist if mre.match(self.pvlist[pv]["msg"])]
-
         # id, datum, record_name, severity, eventtime, status
-        self.cur_log.execute(SQL_HISTORY_GROUP, (starttime, endtime, pvlist))
-        data = self.cur_log.fetchall()
+        sql_str = SQL_HISTORY_GROUP.format(self.root)
+        params = (starttime, endtime, pvlist["record_name"].tolist())
 
-        data = [r + (self.pvlist[r[2]]["group"], self.pvlist[r[2]]["msg"])
-                for r in data]
+        try:
+            data = pd.read_sql(sql=sql_str, con=self.conn_log, params=params)
+        except ValueError:
+            raise
 
-        return data
+        ret = data.merge(self.pvlist)
+
+        return ret.sort_values(by="id", ascending=False)
 
     def update_pvlist(self):
-        # name, message, group, sgroup, ssgroup
+        # record_name, message, group, sub_group, sub_sub_group
         sql_str = SQL_PV_LIST.format(self.root)
-        self.cur_alm.execute(sql_str)
-        data = self.cur_alm.fetchall()
+        try:
+            df = pd.read_sql(sql=sql_str, con=self.conn_alm)
+        except ValueError:
+            df = self.pvlist
 
-        for row in data:
-            if not row[2]:
-                continue
-            group = row[2]
-            group += " / " + row[3] if row[3] else ""
-            group += " / " + row[4] if row[4] else ""
+        df["group"] = (df["group"] + df["sub_group"].apply(self._sgstr)
+                       + df["sub_sub_group"].apply(self._sgstr))
 
-            if group not in self.grouplist:
-                self.grouplist[group] = []
+        self.pvlist = df.drop(["sub_group", "sub_sub_group"], axis=1)
 
-            self.grouplist[group].append(row[0])
-            self.pvlist[row[0]] = {"msg": row[1], "group": group}
+    def _sgstr(self, sg_str):
+        return " / " + sg_str if sg_str else ""

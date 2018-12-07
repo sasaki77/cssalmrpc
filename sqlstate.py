@@ -20,11 +20,11 @@ SQL_CURRENT_ALARM_ALL = """
                                  AND at3.name != '{0}'
                               THEN at2.name
                             ELSE NULL
-                          END as sub_sub_group,
-                          severity.name,
-                          status.name,
+                          END AS sub_sub_group,
+                          severity.name AS severity,
+                          status.name AS status,
                           pv.descr,
-                          at1.name as pv_name,
+                          at1.name AS pv_name,
                           pv.severity_id
                         FROM
                           pv
@@ -67,11 +67,11 @@ SQL_CURRENT_ALARM_MSG = """
                                  AND at3.name != '{0}'
                               THEN at2.name
                             ELSE NULL
-                          END as sub_sub_group,
-                          severity.name,
-                          status.name,
+                          END AS sub_sub_group,
+                          severity.name AS severity,
+                          status.name AS status,
                           pv.descr,
-                          at1.name as pv_name,
+                          at1.name AS pv_name,
                           pv.severity_id
                         FROM
                           pv
@@ -95,8 +95,8 @@ SQL_CURRENT_ALARM_MSG = """
 
 SQL_PV_LIST = """
               SELECT
-                at1.name AS name,
-                pv.descr,
+                at1.name AS record_name,
+                pv.descr AS message,
                 CASE
                   WHEN at4.name = '{0}'
                     THEN at3.name

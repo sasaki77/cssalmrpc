@@ -5,6 +5,7 @@ from datetime import datetime
 
 from collections import OrderedDict
 
+import pandas as pd
 import psycopg2
 import pvaccess as pva
 
@@ -24,27 +25,17 @@ class AlarmRPC(object):
         entity = arg.getString("entity") if arg.hasField("entity") else ".*"
         msg = arg.getString("message") if arg.hasField("message") else ""
 
-        pattern = re.compile(entity)
-
-        # "time", "group", "subgroup", "subsubgroup"
-        # "severity", "status", "message", "record"
         try:
-            if msg:
-                sql_res = self._rdb.current_alarm_msg(msg)
-            else:
-                sql_res = self._rdb.current_alarm_all()
-        except psycopg2.Error:
+            df = self._get_current_alarm(entity, msg)
+        except ValueError:
             msg = "RDB Error: entity = {}, msg = {}".format(entity, msg)
             ret = self._make_error_res(msg)
             return ret
-
-        filtered_res = []
-        for row in sql_res:
-            group = row[1] + self._sgstr(row[2]) + self._sgstr(row[3])
-            if pattern.match(group):
-                filtered_res.append(row)
-
-        data = zip(*filtered_res)
+        except re.error as e:
+            msg = "regex error ({}) entity = {}, msg = {}"
+            msg = msg.format(e, entity, msg)
+            ret = self._make_error_res(msg)
+            return ret
 
         vals = OrderedDict([("column0", [pva.STRING]),
                             ("column1", [pva.STRING]),
@@ -61,20 +52,17 @@ class AlarmRPC(object):
                   "status", "message", "record"]
         table.setScalarArray("labels", labels)
 
-        if not data:
-            return table
+        time = df["alarm_time"].dt.strftime("%Y-%m-%d %H:%M:%S.%f")
 
-        time = [dt.strftime("%Y-%m-%d %H:%M:%S.%f") for dt in data[0]]
-        group = [g + self._sgstr(sg) + self._sgstr(ssg)
-                 for g, sg, ssg in zip(data[1], data[2], data[3])]
+        value = OrderedDict({"column0": time.astype(str).tolist(),
+                             "column1": df["groups"].tolist(),
+                             "column2": df["severity_id"].tolist(),
+                             "column3": df["severity"].tolist(),
+                             "column4": df["status"].tolist(),
+                             "column5": df["descr"].tolist(),
+                             "column6": df["pv_name"].tolist()})
 
-        table.setStructure("value", OrderedDict({"column0": time,
-                                                 "column1": group,
-                                                 "column2": list(data[8]),
-                                                 "column3": list(data[4]),
-                                                 "column4": list(data[5]),
-                                                 "column5": list(data[6]),
-                                                 "column6": list(data[7])}))
+        table.setStructure("value", value)
 
         return table
 
@@ -82,27 +70,17 @@ class AlarmRPC(object):
         entity = arg.getString("entity") if arg.hasField("entity") else ".*"
         msg = arg.getString("message") if arg.hasField("message") else ""
 
-        pattern = re.compile(entity)
-
-        # "time", "group", "subgroup", "subsubgroup"
-        # "severity", "status", "message", "record"
         try:
-            if msg:
-                sql_res = self._rdb.current_alarm_msg(msg)
-            else:
-                sql_res = self._rdb.current_alarm_all()
-        except psycopg2.Error:
+            df = self._get_current_alarm(entity, msg)
+        except ValueError:
             msg = "RDB Error: entity = {}, msg = {}".format(entity, msg)
             ret = self._make_error_res(msg)
             return ret
-
-        filtered_res = []
-        for row in sql_res:
-            group = row[1] + self._sgstr(row[2]) + self._sgstr(row[3])
-            if pattern.match(group):
-                filtered_res.append(row)
-
-        data = zip(*filtered_res)
+        except re.error as e:
+            msg = "regex error ({}) entity = {}, msg = {}"
+            msg = msg.format(e, entity, msg)
+            ret = self._make_error_res(msg)
+            return ret
 
         vals = OrderedDict([("column0", [pva.ULONG]),
                             ("column1", [pva.STRING]),
@@ -114,17 +92,13 @@ class AlarmRPC(object):
                              'epics:nt/NTTable:1.0')
         table.setScalarArray("labels", ["time", "title", "tags", "text"])
 
-        if not data:
-            return table
+        time = df["alarm_time"].dt.strftime("%s%f").str[:-3]
 
-        time = [int(dt.strftime("%s%f")[:-3]) for dt in data[0]]
-        group = [g + self._sgstr(sg) + self._sgstr(ssg)
-                 for g, sg, ssg in zip(data[1], data[2], data[3])]
-
-        table.setStructure("value", OrderedDict({"column0": time,
-                                                 "column1": list(data[6]),
-                                                 "column2": group,
-                                                 "column3": list(data[7])}))
+        value = OrderedDict({"column0": time.astype(int).tolist(),
+                             "column1": df["descr"].tolist(),
+                             "column2": df["groups"].tolist(),
+                             "column3": df["pv_name"].tolist()})
+        table.setStructure("value", value)
 
         return table
 
@@ -133,20 +107,8 @@ class AlarmRPC(object):
         msg = arg.getString("message") if arg.hasField("message") else ""
 
         try:
-            starttime = arg.getString("starttime")
-            endtime = arg.getString("endtime")
-        except (pva.FieldNotFound, pva.InvalidRequest):
-            print "Error: Invalid argumets"
-            msg = "Arguments Error: starttime or endtime are invalid"
-            msg += ". args = " + str(arg)
-            ret = self._make_error_res(msg)
-            return ret
-
-        # id, datum, record_name, severity, eventtime, status, group, message
-        try:
-            start = self._iso_to_dt(starttime)
-            end = self._iso_to_dt(endtime)
-        except ValueError:
+            start, end = self._get_time_from_arg(arg)
+        except (pva.FieldNotFound, pva.InvalidRequest, ValueError):
             print "Error: Invalid argumets"
             msg = "Arguments Error: starttime or endtime are invalid"
             msg += ". args = " + str(arg)
@@ -155,9 +117,9 @@ class AlarmRPC(object):
 
         try:
             if group == "all":
-                sql_res = self._rdb.history_alarm_all(msg, start, end)
+                df = self._rdb.history_alarm_all(msg, start, end)
             else:
-                sql_res = self._rdb.history_alarm_group(group, msg, start, end)
+                df = self._rdb.history_alarm_group(group, msg, start, end)
         except psycopg2.Error:
             temp = ("RDB Error: entity = {}, msg = {},"
                     "starttime = {}, endtime={}")
@@ -165,16 +127,11 @@ class AlarmRPC(object):
             ret = self._make_error_res(msg)
             return ret
 
-        alarms = []
-        recovers = []
-        for row in sql_res:
-            alarm = str(row[7]) if row[3] != "OK" else ""
-            recover = str(row[7]) if row[3] == "OK" else ""
+        alarms = df["message"].copy()
+        recovers = df["message"].copy()
 
-            alarms.append(alarm)
-            recovers.append(recover)
-
-        data = zip(*sql_res)
+        alarms[df["severity"] == "OK"] = ""
+        recovers[df["severity"] != "OK"] = ""
 
         vals = OrderedDict([("column0", [pva.STRING]),
                             ("column1", [pva.STRING]),
@@ -192,18 +149,15 @@ class AlarmRPC(object):
                   "alarm", "recover", "record"]
         table.setScalarArray("labels", labels)
 
-        if not data:
-            return table
-
-        table.setStructure("value", OrderedDict({"column0": list(data[4]),
-                                                 "column1": list(data[6]),
-                                                 "column2": list(data[3]),
-                                                 "column3": list(data[5]),
-                                                 "column4": alarms,
-                                                 "column5": recovers,
-                                                 "column6": list(data[2])
-                                                 })
-                           )
+        value = OrderedDict({"column0": df["eventtime"].tolist(),
+                             "column1": df["group"].tolist(),
+                             "column2": df["severity"].tolist(),
+                             "column3": df["status"].tolist(),
+                             "column4": alarms.tolist(),
+                             "column5": recovers.tolist(),
+                             "column6": df["record_name"].tolist()
+                             })
+        table.setStructure("value", value)
 
         return table
 
@@ -218,13 +172,48 @@ class AlarmRPC(object):
             raise
 
     def _make_error_res(self, message):
-        ret = pva.PvObject(OrderedDict({"value": pva.BOOLEAN, "descriptor": pva.STRING}
-                                       ),
-                           "epics:nt/NTScalar:1.0")
+        labels = OrderedDict({"value": pva.BOOLEAN, "descriptor": pva.STRING})
+        ret = pva.PvObject(labels, "epics:nt/NTScalar:1.0")
         ret["value"] = False
         ret["descriptor"] = message
         return ret
 
+    def _get_current_alarm(self, group, msg):
+        # "alarm_time", "group", "sub_group", "sub_sub_group"
+        # "severity", "status", "descr", "pv_name", "severity_id"
+        try:
+            if msg:
+                df = self._rdb.current_alarm_msg(msg)
+            else:
+                df = self._rdb.current_alarm_all()
+        except ValueError:
+            raise
+
+        df["groups"] = (df["group"] + df["sub_group"].apply(self._sgstr)
+                        + df["sub_sub_group"].apply(self._sgstr))
+
+        try:
+            filtered_df = df[df["groups"].str.match(group)]
+        except re.error as e:
+            raise
+
+        return filtered_df
+
+    def _get_time_from_arg(self, arg):
+        try:
+            starttime = arg.getString("starttime")
+            endtime = arg.getString("endtime")
+        except (pva.FieldNotFound, pva.InvalidRequest):
+            raise
+
+        # id, datum, record_name, severity, eventtime, status, group, message
+        try:
+            start = self._iso_to_dt(starttime)
+            end = self._iso_to_dt(endtime)
+        except ValueError:
+            raise
+
+        return start, end
 
 
 def parsearg():
