@@ -163,6 +163,58 @@ class AlarmRPC(object):
 
         return table
 
+    def get_history_ann(self, arg):
+        group = arg.getString("entity") if arg.hasField("entity") else "all"
+        msg = arg.getString("message") if arg.hasField("message") else ""
+        svr = arg.getString("severity") if arg.hasField("severity") else ""
+
+        try:
+            start, end = self._get_time_from_arg(arg)
+        except (pva.FieldNotFound, pva.InvalidRequest, ValueError):
+            print "Error: Invalid argumets"
+            msg = "Arguments Error: starttime or endtime are invalid"
+            msg += ". args = " + str(arg)
+            ret = self._make_error_res(msg)
+            return ret
+
+        try:
+            if group == "all":
+                df = self._rdb.history_alarm_all(msg, start, end)
+            else:
+                df = self._rdb.history_alarm_group(group, msg, start, end)
+        except psycopg2.Error:
+            temp = ("RDB Error: entity = {}, msg = {},"
+                    "starttime = {}, endtime={}")
+            msg = temp.format(entity, msg, starttime, endtime)
+            ret = self._make_error_res(msg)
+            return ret
+
+        df = df[df["severity"].str.match(svr)]
+
+        vals = OrderedDict([("column0", [pva.ULONG]),
+                            ("column1", [pva.STRING]),
+                            ("column2", [pva.STRING]),
+                            ("column3", [pva.STRING])])
+        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
+                                          "value": vals}
+                                         ),
+                             'epics:nt/NTTable:1.0')
+        table.setScalarArray("labels", ["time", "title", "tags", "text"])
+
+        df["eventtime"] = pd.to_datetime(df["eventtime"])
+        if df["eventtime"].empty:
+            time = df["eventtime"]
+        else:
+            time = df["eventtime"].dt.strftime("%s%f").str[:-3]
+
+        value = OrderedDict({"column0": time.astype(int).tolist(),
+                             "column1": df["message"].tolist(),
+                             "column2": df["group"].tolist(),
+                             "column3": df["severity"].tolist()})
+        table.setStructure("value", value)
+
+        return table
+
     def _sgstr(self, sg_str):
         return " / " + sg_str if sg_str else ""
 
@@ -244,6 +296,7 @@ def main():
     srv.registerService(arg.prefix + "current", alarm_rpc.get_current)
     srv.registerService(arg.prefix + "current:ann", alarm_rpc.get_current_ann)
     srv.registerService(arg.prefix + "history", alarm_rpc.get_history)
+    srv.registerService(arg.prefix + "history:ann", alarm_rpc.get_history_ann)
     srv.startListener()
 
     try:

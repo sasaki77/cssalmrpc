@@ -59,7 +59,8 @@ class AlarmSql(object):
         # with message filter
         if message and message != ".*":
             try:
-                pvlist = self.pvlist[self.pvlist["message"].str.contains(message)]
+                mask = self.pvlist["message"].str.contains(message)
+                pvlist = self.pvlist[mask]
             except re.error:
                 return []
             # id, datum, record_name, severity, eventtime, status
