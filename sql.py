@@ -1,6 +1,7 @@
 import re
 
 import pandas as pd
+from pandas.io.sql import DatabaseError
 import psycopg2
 
 from sqlstate import *
@@ -43,7 +44,7 @@ class AlarmSql(object):
         sql_str = SQL_CURRENT_ALARM_ALL.format(self.root)
         try:
             data = pd.read_sql(sql=sql_str, con=self.conn_alm)
-        except ValueError:
+        except (ValueError, DatabaseError):
             raise
         return data
 
@@ -51,7 +52,7 @@ class AlarmSql(object):
         sql_str = SQL_CURRENT_ALARM_MSG.format(self.root, msg)
         try:
             data = pd.read_sql(sql=sql_str, con=self.conn_alm)
-        except ValueError:
+        except (ValueError, DatabaseError):
             raise
         return data
 
@@ -71,7 +72,7 @@ class AlarmSql(object):
             try:
                 data = pd.read_sql(sql=sql_str, con=self.conn_log,
                                    params=params)
-            except ValueError:
+            except (ValueError, DatabaseError):
                 raise
 
             ret = data.merge(self.pvlist)
@@ -86,7 +87,7 @@ class AlarmSql(object):
         try:
             data = pd.read_sql(sql=sql_str, con=self.conn_log,
                                params=params)
-        except ValueError:
+        except (ValueError, DatabaseError):
             raise
 
         ret = data.merge(self.pvlist, how="left")
@@ -109,7 +110,7 @@ class AlarmSql(object):
 
         try:
             data = pd.read_sql(sql=sql_str, con=self.conn_log, params=params)
-        except ValueError:
+        except (ValueError, DatabaseError):
             raise
 
         ret = data.merge(self.pvlist)
@@ -121,7 +122,7 @@ class AlarmSql(object):
         sql_str = SQL_PV_LIST.format(self.root)
         try:
             df = pd.read_sql(sql=sql_str, con=self.conn_alm)
-        except ValueError:
+        except (ValueError, DatabaseError):
             df = self.pvlist
 
         df["group"] = (df["group"] + df["sub_group"].apply(self._sgstr)

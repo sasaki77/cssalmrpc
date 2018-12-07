@@ -7,6 +7,7 @@ from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
+from pandas.io.sql import DatabaseError
 import psycopg2
 import pvaccess as pva
 
@@ -28,7 +29,7 @@ class AlarmRPC(object):
 
         try:
             df = self._get_current_alarm(entity, msg)
-        except ValueError:
+        except (ValueError, DatabaseError):
             msg = "RDB Error: entity = {}, msg = {}".format(entity, msg)
             ret = self._make_error_res(msg)
             return ret
@@ -71,7 +72,7 @@ class AlarmRPC(object):
 
         try:
             df = self._get_current_alarm(entity, msg)
-        except ValueError:
+        except (ValueError, DatabaseError):
             msg = "RDB Error: entity = {}, msg = {}".format(entity, msg)
             ret = self._make_error_res(msg)
             return ret
@@ -240,7 +241,7 @@ class AlarmRPC(object):
                 df = self._rdb.current_alarm_msg(msg)
             else:
                 df = self._rdb.current_alarm_all()
-        except ValueError:
+        except (ValueError, DatabaseError):
             raise
 
         df["groups"] = (df["group"] + df["sub_group"].apply(self._sgstr)
