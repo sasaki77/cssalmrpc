@@ -5,6 +5,7 @@ from datetime import datetime
 
 from collections import OrderedDict
 
+import numpy as np
 import pandas as pd
 import psycopg2
 import pvaccess as pva
@@ -52,9 +53,7 @@ class AlarmRPC(object):
                   "status", "message", "record"]
         table.setScalarArray("labels", labels)
 
-        time = df["alarm_time"].dt.strftime("%Y-%m-%d %H:%M:%S.%f")
-
-        value = OrderedDict({"column0": time.astype(str).tolist(),
+        value = OrderedDict({"column0": df["alarm_time"].astype(str).tolist(),
                              "column1": df["groups"].tolist(),
                              "column2": df["severity_id"].tolist(),
                              "column3": df["severity"].tolist(),
@@ -92,7 +91,10 @@ class AlarmRPC(object):
                              'epics:nt/NTTable:1.0')
         table.setScalarArray("labels", ["time", "title", "tags", "text"])
 
-        time = df["alarm_time"].dt.strftime("%s%f").str[:-3]
+        if df["alarm_time"].empty:
+            time = df["alarm_time"]
+        else:
+            time = df["alarm_time"].dt.strftime("%s%f").str[:-3]
 
         value = OrderedDict({"column0": time.astype(int).tolist(),
                              "column1": df["descr"].tolist(),
