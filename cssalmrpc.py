@@ -130,6 +130,9 @@ class AlarmRPC(object):
             ret = self._make_error_res(msg)
             return ret
 
+        # Drop lines if it has NaN value
+        df = df.dropna()
+
         alarms = df["message"].copy()
         recovers = df["message"].copy()
 
@@ -189,6 +192,9 @@ class AlarmRPC(object):
             msg = temp.format(entity, msg, starttime, endtime)
             ret = self._make_error_res(msg)
             return ret
+
+        # Drop lines if it has NaN value
+        df = df.dropna()
 
         df = df[df["severity"].str.match(svr)]
 
