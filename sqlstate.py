@@ -40,9 +40,12 @@ SQL_CURRENT_ALARM_BASE = """
                                ON at2.parent_cmpnt_id = at3.component_id
                              LEFT JOIN alarm_tree AS at4
                                ON at3.parent_cmpnt_id = at4.component_id
+                             LEFT JOIN alarm_tree AS at5
+                               ON at4.parent_cmpnt_id = at5.component_id
                          WHERE
                            pv.severity_id > 1
-                           AND (at3.name = '{0}' OR at4.name = '{0}')
+                           AND (at3.name = '{0}' OR at4.name = '{0}'
+                                OR at5.name = '{0}')
                            {1}
                          """
 
