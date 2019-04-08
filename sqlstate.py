@@ -97,41 +97,52 @@ SQL_PV_LIST = """
 
 SQL_HISTORY_BASE = """
                    SELECT
-                     message.id AS id,
-                     message.datum AS datum,
-                     message.name AS record_name,
-                     message.severity AS severity,
-                     MAX(
-                       CASE
-                         WHEN message_content.msg_property_type_id = 2
-                           THEN message_content.value
-                         ELSE '-'
-                       END
-                     ) AS eventtime,
-                     MAX(
-                       CASE
-                         WHEN message_content.msg_property_type_id = 19
-                           THEN message_content.value
-                         ELSE '-'
-                       END
-                     ) AS status
+                     *
                    FROM
-                     message
-                     JOIN message_content
-                       ON message.id=message_content.message_id
-                          AND (message_content.msg_property_type_id = 19
-                               OR message_content.msg_property_type_id = 2
-                               )
+                   (
+                     SELECT
+                       message.id AS id
+                     , message.datum AS datum
+                     , message.name AS record_name
+                     , message.severity AS severity
+                     , MAX(
+                         CASE
+                           WHEN msg_property_type.name = 'EVENTTIME'
+                             THEN message_content.value
+                           ELSE '-'
+                         END
+                       ) AS eventtime
+                     , MAX(
+                         CASE
+                           WHEN msg_property_type.name = 'STATUS'
+                             THEN message_content.value
+                           ELSE '-'
+                         END
+                       ) AS status
+                     FROM
+                       message
+                       JOIN message_content
+                         ON message.id=message_content.message_id
+                       JOIN msg_property_type
+                         ON message_content.msg_property_type_id = msg_property_type.id
+                            AND (msg_property_type.name = 'EVENTTIME'
+                                 OR msg_property_type.name = 'STATUS'
+                                 )
+                     WHERE
+                       message.datum BETWEEN %s AND %s
+                       AND message.type='alarm'
+                       {0}
+                     GROUP BY
+                       message.id
+                     ORDER BY
+                       message.datum DESC
+                     LIMIT
+                       100000
+                   ) t
                    WHERE
-                     message.datum BETWEEN %s AND %s
-                     AND message.type='alarm'
-                     {0}
-                   GROUP BY
-                     message.id
-                   ORDER BY
-                     message.datum DESC
-                   LIMIT
-                     100000
+                     status != 'OK'
+                     AND status != 'Disabled'
+                     AND status != 'Starting'
                    """
 
 SQL_HISTORY_ALL = SQL_HISTORY_BASE.format("")
