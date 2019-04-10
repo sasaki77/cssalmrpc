@@ -3,8 +3,6 @@ import re
 import argparse
 from datetime import datetime
 
-from collections import OrderedDict
-
 import numpy as np
 import pandas as pd
 from pandas.io.sql import DatabaseError
@@ -39,28 +37,28 @@ class AlarmRPC(object):
             ret = self._make_error_res(msg)
             return ret
 
-        vals = OrderedDict([("column0", [pva.STRING]),
-                            ("column1", [pva.STRING]),
-                            ("column2", [pva.LONG]),
-                            ("column3", [pva.STRING]),
-                            ("column4", [pva.STRING]),
-                            ("column5", [pva.STRING]),
-                            ("column6", [pva.STRING])])
-        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
-                                          "value": vals}
-                                         ),
+        vals = {"column0": [pva.STRING],
+                "column1": [pva.STRING],
+                "column2": [pva.LONG],
+                "column3": [pva.STRING],
+                "column4": [pva.STRING],
+                "column5": [pva.STRING],
+                "column6": [pva.STRING]
+                }
+        table = pva.PvObject({"labels": [pva.STRING], "value": vals},
                              'epics:nt/NTTable:1.0')
         labels = ["time", "group",  "severity_id", "severity",
                   "status", "message", "record"]
         table.setScalarArray("labels", labels)
 
-        value = OrderedDict({"column0": df["alarm_time"].astype(str).tolist(),
-                             "column1": df["groups"].tolist(),
-                             "column2": df["severity_id"].tolist(),
-                             "column3": df["severity"].tolist(),
-                             "column4": df["status"].tolist(),
-                             "column5": df["descr"].tolist(),
-                             "column6": df["pv_name"].tolist()})
+        value = {"column0": df["alarm_time"].astype(str).tolist(),
+                 "column1": df["groups"].tolist(),
+                 "column2": df["severity_id"].tolist(),
+                 "column3": df["severity"].tolist(),
+                 "column4": df["status"].tolist(),
+                 "column5": df["descr"].tolist(),
+                 "column6": df["pv_name"].tolist()
+                 }
 
         table.setStructure("value", value)
 
@@ -82,13 +80,11 @@ class AlarmRPC(object):
             ret = self._make_error_res(msg)
             return ret
 
-        vals = OrderedDict([("column0", [pva.ULONG]),
-                            ("column1", [pva.STRING]),
-                            ("column2", [pva.STRING]),
-                            ("column3", [pva.STRING])])
-        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
-                                          "value": vals}
-                                         ),
+        vals = {"column0": [pva.ULONG],
+                "column1": [pva.STRING],
+                "column2": [pva.STRING],
+                "column3": [pva.STRING]}
+        table = pva.PvObject({"labels": [pva.STRING], "value": vals},
                              'epics:nt/NTTable:1.0')
         table.setScalarArray("labels", ["time", "title", "tags", "text"])
 
@@ -97,10 +93,11 @@ class AlarmRPC(object):
         else:
             time = df["alarm_time"].dt.strftime("%s%f").str[:-3]
 
-        value = OrderedDict({"column0": time.astype(int).tolist(),
-                             "column1": df["descr"].tolist(),
-                             "column2": df["groups"].tolist(),
-                             "column3": df["pv_name"].tolist()})
+        value = {"column0": time.astype(int).tolist(),
+                 "column1": df["descr"].tolist(),
+                 "column2": df["groups"].tolist(),
+                 "column3": df["pv_name"].tolist()
+                 }
         table.setStructure("value", value)
 
         return table
@@ -112,7 +109,7 @@ class AlarmRPC(object):
         try:
             start, end = self._get_time_from_arg(arg)
         except (pva.FieldNotFound, pva.InvalidRequest, ValueError):
-            print "Error: Invalid argumets"
+            print("Error: Invalid argumets")
             msg = "Arguments Error: starttime or endtime are invalid"
             msg += ". args = " + str(arg)
             ret = self._make_error_res(msg)
@@ -139,30 +136,28 @@ class AlarmRPC(object):
         alarms[df["severity"] == "OK"] = ""
         recovers[df["severity"] != "OK"] = ""
 
-        vals = OrderedDict([("column0", [pva.STRING]),
-                            ("column1", [pva.STRING]),
-                            ("column2", [pva.STRING]),
-                            ("column3", [pva.STRING]),
-                            ("column4", [pva.STRING]),
-                            ("column5", [pva.STRING]),
-                            ("column6", [pva.STRING])
-                            ])
-        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
-                                         "value": vals}
-                                         ),
+        vals = {"column0": [pva.STRING],
+                "column1": [pva.STRING],
+                "column2": [pva.STRING],
+                "column3": [pva.STRING],
+                "column4": [pva.STRING],
+                "column5": [pva.STRING],
+                "column6": [pva.STRING],
+                }
+        table = pva.PvObject({"labels": [pva.STRING], "value": vals},
                              'epics:nt/NTTable:1.0')
         labels = ["time", "group", "severity", "status",
                   "alarm", "recover", "record"]
         table.setScalarArray("labels", labels)
 
-        value = OrderedDict({"column0": df["eventtime"].tolist(),
-                             "column1": df["group"].tolist(),
-                             "column2": df["severity"].tolist(),
-                             "column3": df["status"].tolist(),
-                             "column4": alarms.tolist(),
-                             "column5": recovers.tolist(),
-                             "column6": df["record_name"].tolist()
-                             })
+        value = {"column0": df["eventtime"].tolist(),
+                 "column1": df["group"].tolist(),
+                 "column2": df["severity"].tolist(),
+                 "column3": df["status"].tolist(),
+                 "column4": alarms.tolist(),
+                 "column5": recovers.tolist(),
+                 "column6": df["record_name"].tolist()
+                 }
         table.setStructure("value", value)
 
         return table
@@ -175,7 +170,7 @@ class AlarmRPC(object):
         try:
             start, end = self._get_time_from_arg(arg)
         except (pva.FieldNotFound, pva.InvalidRequest, ValueError):
-            print "Error: Invalid argumets"
+            print("Error: Invalid argumets")
             msg = "Arguments Error: starttime or endtime are invalid"
             msg += ". args = " + str(arg)
             ret = self._make_error_res(msg)
@@ -198,13 +193,12 @@ class AlarmRPC(object):
 
         df = df[df["severity"].str.match(svr)]
 
-        vals = OrderedDict([("column0", [pva.ULONG]),
-                            ("column1", [pva.STRING]),
-                            ("column2", [pva.STRING]),
-                            ("column3", [pva.STRING])])
-        table = pva.PvObject(OrderedDict({"labels": [pva.STRING],
-                                          "value": vals}
-                                         ),
+        vals = {"column0": [pva.ULONG],
+                "column1": [pva.STRING],
+                "column2": [pva.STRING],
+                "column3": [pva.STRING]
+                }
+        table = pva.PvObject({"labels": [pva.STRING], "value": vals},
                              'epics:nt/NTTable:1.0')
         table.setScalarArray("labels", ["time", "title", "tags", "text"])
 
@@ -214,10 +208,11 @@ class AlarmRPC(object):
         else:
             time = df["eventtime"].dt.strftime("%s%f").str[:-3]
 
-        value = OrderedDict({"column0": time.astype(int).tolist(),
-                             "column1": df["message"].tolist(),
-                             "column2": df["group"].tolist(),
-                             "column3": df["severity"].tolist()})
+        value = {"column0": time.astype(int).tolist(),
+                 "column1": df["message"].tolist(),
+                 "column2": df["group"].tolist(),
+                 "column3": df["severity"].tolist()
+                 }
         table.setStructure("value", value)
 
         return table
@@ -233,7 +228,7 @@ class AlarmRPC(object):
             raise
 
     def _make_error_res(self, message):
-        labels = OrderedDict({"value": pva.BOOLEAN, "descriptor": pva.STRING})
+        labels = {"value": pva.BOOLEAN, "descriptor": pva.STRING}
         ret = pva.PvObject(labels, "epics:nt/NTScalar:1.0")
         ret["value"] = False
         ret["descriptor"] = message
@@ -310,7 +305,7 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print "exit"
+        print("exit")
     finally:
         alarm_rpc.close()
 

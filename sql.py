@@ -38,7 +38,7 @@ class AlarmSql(object):
         if self.conn_log:
             self.conn_log.close()
 
-        print "close"
+        print("close")
 
     def current_alarm_all(self):
         sql_str = SQL_CURRENT_ALARM_ALL.format(self.root)

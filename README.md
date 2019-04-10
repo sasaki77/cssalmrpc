@@ -5,6 +5,7 @@ This program is pvAccess RPC server to publish CSS alarm status and log RDB.
 ## Features
 - Supports only PostgreSQL backend
 - Supports 2nd depth system from area
+- Python 3.7 or later is required
 
 ## Installing
 
