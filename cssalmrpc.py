@@ -2,6 +2,7 @@ import time
 import re
 import argparse
 from datetime import datetime
+from dateutil import tz
 
 import numpy as np
 import pandas as pd
@@ -17,6 +18,12 @@ class AlarmRPC(object):
         self._rdb = AlarmSql(dbname, logdbname, host, dbuser, root)
         self._rdb.connect()
         self._rdb.update_pvlist()
+
+    def jst2utc(self, x):
+        JST = tz.gettz('Asia/Tokyo')
+        UTC = tz.gettz("UTC")
+        dt_utc = x.replace(tzinfo=JST).astimezone(UTC)
+        return dt_utc.strftime('%Y-%m-%d %H:%M:%S.%f')
 
     def close(self):
         self._rdb.close()
@@ -51,7 +58,9 @@ class AlarmRPC(object):
                   "status", "message", "record"]
         table.setScalarArray("labels", labels)
 
-        value = {"column0": df["alarm_time"].astype(str).tolist(),
+        time = df["alarm_time"].map(self.jst2utc)
+
+        value = {"column0": time.tolist(),
                  "column1": df["groups"].tolist(),
                  "column2": df["severity_id"].tolist(),
                  "column3": df["severity"].tolist(),
@@ -130,6 +139,9 @@ class AlarmRPC(object):
         # Drop lines if it has NaN value
         df = df.dropna()
 
+
+        todt = lambda x: datetime.strptime(x, '%Y-%m-%d %H:%M:%S.%f')
+        eventtime = df["eventtime"].map(todt).map(self.jst2utc)
         alarms = df["message"].copy()
         recovers = df["message"].copy()
 
@@ -150,7 +162,7 @@ class AlarmRPC(object):
                   "alarm", "recover", "record"]
         table.setScalarArray("labels", labels)
 
-        value = {"column0": df["eventtime"].tolist(),
+        value = {"column0": eventtime.tolist(),
                  "column1": df["group"].tolist(),
                  "column2": df["severity"].tolist(),
                  "column3": df["status"].tolist(),
